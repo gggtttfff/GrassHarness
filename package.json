@@ -1,0 +1,31 @@
+{
+  "name": "grass-harness",
+  "version": "0.1.0",
+  "description": "种子不动。用过的东西，长在日志里。",
+  "type": "module",
+  "bin": {
+    "grass-harness": "./src/cli.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gggtttfff/GrassHarness.git"
+  },
+  "author": "Pieory",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/cli.ts",
+    "grow": "node --disable-warning=ExperimentalWarning src/cli.ts grow",
+    "typecheck": "tsc --noEmit",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-reporter=spec \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "grassagent": "github:gggtttfff/GrassAgent"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^5.6.3"
+  }
+}
