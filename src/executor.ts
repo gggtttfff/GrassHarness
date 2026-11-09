@@ -15,6 +15,7 @@ import { HarnessRegistry } from './registry.ts'
 export interface HarnessRuntime {
   registry: HarnessRegistry
   context: Context
+  sessionId: string
   setSystemPrompt(prompt: string): void
   runTurn(signal?: AbortSignal): AsyncGenerator<AgentEvent>
   sync(): void
@@ -81,6 +82,7 @@ export async function createRuntime(options: {
   return {
     registry,
     context,
+    sessionId: sessionStore.sessionId,
     setSystemPrompt(prompt: string) {
       context.systemPrompt = prompt
     },

@@ -59,6 +59,33 @@ export function parseGrowArgs(argv: string[]): {
 }
 
 /** 先在内存里试一次，成功才追加到日志。失败时文件保持原样。 */
+export async function commitGrowth(options: {
+  harnessDir: string
+  growthDir: string
+  domain: string
+  input: {
+    id: string
+    title: string
+    body: string
+    situation: string
+    lesson: string
+    sessionId: string
+    excerpt: string
+    order?: number
+    op?: GrowthOp
+  }
+}): Promise<string> {
+  const record = createGrowthRecord({ ...options.input, domain: options.domain })
+  await ensureSeedDir(options.harnessDir)
+  const composed = await composeHarness({
+    harnessDir: options.harnessDir,
+    growthDir: options.growthDir,
+    domain: options.domain,
+  })
+  applyGrowth(composed.components, record)
+  return new GrowthLog(options.growthDir).append(record)
+}
+
 export async function runGrow(argv: string[], environment?: NodeJS.ProcessEnv): Promise<string> {
   const input = parseGrowArgs(argv)
   const config = await loadConfig({
@@ -66,16 +93,10 @@ export async function runGrow(argv: string[], environment?: NodeJS.ProcessEnv): 
     environment,
     envFilePath: environment ? '/dev/null' : undefined,
   })
-  const domain = input.domain ?? config.domain
-  const record = createGrowthRecord({ ...input, domain })
-
-  await ensureSeedDir(config.harnessDir)
-  const composed = await composeHarness({
+  return commitGrowth({
     harnessDir: config.harnessDir,
     growthDir: config.growthDir,
-    domain,
+    domain: input.domain ?? config.domain,
+    input,
   })
-  applyGrowth(composed.components, record)
-
-  return new GrowthLog(config.growthDir).append(record)
 }

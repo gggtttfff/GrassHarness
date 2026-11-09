@@ -5,7 +5,9 @@ import { assembleSystemPrompt } from './assemble.ts'
 import { loadConfig } from './config.ts'
 import { composeHarness } from './compose.ts'
 import { createRuntime } from './executor.ts'
+import { commitGrowth } from './growCommand.ts'
 import { ensureSeedDir } from './load.ts'
+import { acceptsGrowth, growthInputFromLesson, turnExcerpt } from './sessionGrow.ts'
 
 interface LineQueue {
   push(line: string | null): void
@@ -49,6 +51,47 @@ async function currentPrompt(config: Awaited<ReturnType<typeof loadConfig>>): Pr
     console.error(`[grass-harness] 生长日志有 ${composed.skipped} 行读不懂，已跳过`)
   }
   return assembleSystemPrompt(composed.components)
+}
+
+async function adoptInSession(
+  text: string,
+  lines: LineQueue,
+  config: Awaited<ReturnType<typeof loadConfig>>,
+  runtime: Awaited<ReturnType<typeof createRuntime>>,
+): Promise<'quit' | 'stay'> {
+  let lesson = text.slice('/grow'.length).trim()
+  if (!lesson) {
+    console.log('要记下什么？')
+    const typed = await lines.take()
+    if (typed === null || typed.trim() === '/quit') return 'quit'
+    lesson = typed.trim()
+  }
+  if (!lesson) {
+    console.log('没有记下')
+    return 'stay'
+  }
+
+  console.log(`记下「${lesson}」？输入 y 确认`)
+  const answer = await lines.take()
+  if (answer === null || answer.trim() === '/quit') return 'quit'
+  if (!acceptsGrowth(answer)) {
+    console.log('没有记下')
+    return 'stay'
+  }
+
+  try {
+    const filePath = await commitGrowth({
+      harnessDir: config.harnessDir,
+      growthDir: config.growthDir,
+      domain: config.domain,
+      input: growthInputFromLesson(lesson, turnExcerpt(runtime.context.messages, runtime.sessionId)),
+    })
+    runtime.setSystemPrompt(await currentPrompt(config))
+    console.log(`已写入 ${filePath}`)
+  } catch (error) {
+    console.error(`[grass-harness] ${(error as Error).message}`)
+  }
+  return 'stay'
 }
 
 export async function runChat(environment?: NodeJS.ProcessEnv): Promise<void> {
@@ -96,6 +139,7 @@ export async function runChat(environment?: NodeJS.ProcessEnv): Promise<void> {
   })
 
   console.log('GrassHarness。输入后回车，/quit 退出。')
+  console.log('/grow 一句话，再输入 y，就把这句话写进生长日志。下一轮会用到。')
   console.log(`种子 ${config.harnessDir}`)
   console.log(`生长 ${config.growthDir}/${config.domain}.jsonl`)
 
@@ -105,6 +149,11 @@ export async function runChat(environment?: NodeJS.ProcessEnv): Promise<void> {
     const text = line.trim()
     if (!text) continue
     if (text === '/quit') break
+    if (text === '/grow' || text.startsWith('/grow ')) {
+      const wrote = await adoptInSession(text, lines, config, runtime)
+      if (wrote === 'quit') break
+      continue
+    }
     if (text.startsWith('/')) {
       console.log(`没有这个命令: ${text}`)
       continue
